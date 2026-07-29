@@ -53,7 +53,7 @@ if (cmd === 'auth') {
     console.log(`Cloudflare Account ID: ${cfg.cf_account_id || '(not set)'}`);
   }
   process.exit(0);
-} else if (cmd === 'help' || cmd === '--help' || cmd === -h) {
+} else if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
   console.log(`
 Genius GTM MCP server
 
