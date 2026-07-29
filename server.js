@@ -21,6 +21,9 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || saved.client_id;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || saved.client_secret;
 const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || saved.refresh_token;
 
+const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || saved.cf_account_id;
+const CF_API_TOKEN = process.env.CF_API_TOKEN || saved.cf_api_token;
+
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
   console.error(
     'Genius GTM MCP — not configured yet.\n\n' +
@@ -82,7 +85,7 @@ async function workspaceResource(svc, action, a, plural) {
   throw new Error(`Invalid action: ${action}`);
 }
 
-// ─── tool definitions (19 GTM + 2 Custom Tools) ──────────────────────────────
+// ─── tool definitions ────────────────────────────────────────────────────────
 const tools = [
   { name: 'gtm_account', description: 'Manage GTM accounts. actions: list | get | update.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','update'] }, accountId: { type: 'string' }, payload: { type: 'object' } }, required: ['action'] } },
   { name: 'gtm_container', description: 'Manage containers. actions: list | get | create | update | delete | snippet | lookup | combine | move_tag_id.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','create','update','delete','snippet','lookup','combine','move_tag_id'] }, accountId: { type: 'string' }, containerId: { type: 'string' }, destinationId: { type: 'string' }, tagId: { type: 'string' }, payload: { type: 'object' } }, required: ['action','accountId'] } },
@@ -127,6 +130,18 @@ const tools = [
         eventName: { type: 'string', description: 'Standard event name' }
       }, 
       required: ['platform', 'eventName'] 
+    } 
+  },
+  { 
+    name: 'cloudflare_worker_deploy', 
+    description: 'Deploy or update a Cloudflare Worker script (e.g., Server-Side GTM proxy or tracking script).', 
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        workerName: { type: 'string', description: 'Name of the Cloudflare Worker' },
+        scriptContent: { type: 'string', description: 'The complete JavaScript code for the Worker' }
+      }, 
+      required: ['workerName', 'scriptContent'] 
     } 
   }
 ];
@@ -334,12 +349,42 @@ async function handleCall(name, a) {
       });
     }
 
+    case 'cloudflare_worker_deploy': {
+      if (!CF_ACCOUNT_ID || !CF_API_TOKEN) {
+        throw new Error('Cloudflare credentials not found! Run "node cli.js cf-auth" in your terminal first.');
+      }
+
+      const { workerName, scriptContent } = a;
+      const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/scripts/${workerName}`;
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CF_API_TOKEN}`,
+          'Content-Type': 'application/javascript'
+        },
+        body: scriptContent
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error('Cloudflare API Error: ' + JSON.stringify(data.errors, null, 2));
+      }
+
+      return ok({
+        message: `Successfully deployed Worker "${workerName}" to Cloudflare!`,
+        worker_id: data.result?.id || workerName,
+        status: "LIVE"
+      });
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
 }
 
-// ─── MCP server wiring ────────────────────────────────────────────────────────
+// ─── MCP server wiring ────────────────────────────────------------------------
 const server = new Server(
   { name: 'genius-gtm-mcp', version: '1.0.0' },
   { capabilities: { tools: {} } },
