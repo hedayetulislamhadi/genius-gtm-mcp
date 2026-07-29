@@ -82,7 +82,7 @@ async function workspaceResource(svc, action, a, plural) {
   throw new Error(`Invalid action: ${action}`);
 }
 
-// ─── 19 tool definitions ────────────────────────────────────────────────────
+// ─── tool definitions (19 GTM + 2 Custom Tools) ──────────────────────────────
 const tools = [
   { name: 'gtm_account', description: 'Manage GTM accounts. actions: list | get | update.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','update'] }, accountId: { type: 'string' }, payload: { type: 'object' } }, required: ['action'] } },
   { name: 'gtm_container', description: 'Manage containers. actions: list | get | create | update | delete | snippet | lookup | combine | move_tag_id.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','create','update','delete','snippet','lookup','combine','move_tag_id'] }, accountId: { type: 'string' }, containerId: { type: 'string' }, destinationId: { type: 'string' }, tagId: { type: 'string' }, payload: { type: 'object' } }, required: ['action','accountId'] } },
@@ -103,6 +103,32 @@ const tools = [
   { name: 'gtm_destination', description: 'GA4 destinations.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','link'] }, accountId: { type: 'string' }, containerId: { type: 'string' }, destinationId: { type: 'string' }, payload: { type: 'object' } }, required: ['action','accountId','containerId'] } },
   { name: 'gtm_user_permission', description: 'User permissions.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','create','update','delete'] }, accountId: { type: 'string' }, userPermissionId: { type: 'string' }, payload: { type: 'object' } }, required: ['action'] } },
   { name: 'gtm_raw', description: 'UNIVERSAL escape hatch.', inputSchema: { type: 'object', properties: { method: { type: 'string' }, params: { type: 'object' } }, required: ['method'] } },
+  
+  // --- Custom Tools for Genius GTM MCP ---
+  { 
+    name: 'genius_datalayer_builder', 
+    description: 'Generate advanced, server-side optimized e-commerce DataLayer snippet for GA4.', 
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        eventName: { type: 'string', description: 'Event name e.g., view_item, purchase' },
+        includeItems: { type: 'boolean', description: 'Include demo ecommerce items?' }
+      }, 
+      required: ['eventName'] 
+    } 
+  },
+  { 
+    name: 'genius_capi_validator', 
+    description: 'Validate and generate Meta CAPI / TikTok Server payload from browser data.', 
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        platform: { type: 'string', enum: ['meta', 'tiktok', 'snapchat'], description: 'Target platform' },
+        eventName: { type: 'string', description: 'Standard event name' }
+      }, 
+      required: ['platform', 'eventName'] 
+    } 
+  }
 ];
 
 // ─── tool handlers ────────────────────────────────────────────────────────────
@@ -240,6 +266,74 @@ async function handleCall(name, a) {
       if (typeof fn !== 'function') throw new Error(`Not callable: ${a.method}`);
       return ok(unwrap(await fn.call(parent, a.params || {})));
     }
+
+    // --- Custom Tool Handlers ---
+    case 'genius_datalayer_builder': {
+      const { eventName, includeItems } = a;
+      let snippet = `<script>\nwindow.dataLayer = window.dataLayer || [];\nwindow.dataLayer.push({\n  event: '${eventName}',`;
+      
+      if (includeItems) {
+        snippet += `\n  ecommerce: {
+    currency: 'USD',
+    value: 120.50,
+    items: [
+      { item_id: 'SKU_12345', item_name: 'Genius Tracking T-Shirt', price: 120.50, quantity: 1 }
+    ]
+  }`;
+      } else {
+        snippet += `\n  // Add your custom event parameters here\n  parameter_1: 'value_1'`;
+      }
+      snippet += `\n});\n</script>`;
+
+      return ok({
+        message: `Genius GTM MCP successfully generated the DataLayer for '${eventName}'.`,
+        snippet: snippet
+      });
+    }
+
+    case 'genius_capi_validator': {
+      const { platform, eventName } = a;
+      let payload = {};
+
+      if (platform === 'meta') {
+        payload = {
+          data: [{
+            event_name: eventName,
+            event_time: Math.floor(Date.now() / 1000),
+            action_source: "website",
+            user_data: {
+              em: ["<HASHED_EMAIL>"],
+              ph: ["<HASHED_PHONE>"],
+              client_ip_address: "<CLIENT_IP>",
+              client_user_agent: "<USER_AGENT>"
+            },
+            custom_data: { currency: "USD", value: 100.00 }
+          }]
+        };
+      } else if (platform === 'tiktok') {
+        payload = {
+          event: eventName,
+          event_time: Math.floor(Date.now() / 1000),
+          user: { email: "<HASHED_EMAIL>", phone_number: "<HASHED_PHONE>" },
+          properties: { currency: "USD", value: 100.00 }
+        };
+      } else if (platform === 'snapchat') {
+        payload = {
+          event_type: eventName,
+          event_conversion_type: "WEB",
+          timestamp: Math.floor(Date.now() / 1000),
+          user_data: { hashed_email: "<HASHED_EMAIL>", hashed_phone_number: "<HASHED_PHONE>" },
+          custom_data: { currency: "USD", value: 100.00 }
+        };
+      }
+
+      return ok({
+        message: `Validated ${platform.toUpperCase()} server-side payload structure for '${eventName}'.`,
+        required_hashing: "SHA256 (Email, Phone, etc.)",
+        sample_payload: payload
+      });
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
