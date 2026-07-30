@@ -19,3 +19,34 @@ Quick verification — paste both commands in your terminal:
 ```bash
 node --version   # should print v18.x or newer
 git --version    # should print git version 2.x or newer
+
+
+If either prints "command not found", install it using the link above before continuing.
+
+Quick start — 3 steps
+Step 1 — Create your Google Cloud OAuth client (5 min, one-time)
+You use your own Google Cloud project for this. That way your API quota is your own, and no credentials are shared.
+
+Open https://console.cloud.google.com/apis/library/tagmanager.googleapis.com → click Enable
+
+Open https://console.cloud.google.com/apis/credentials/consent
+
+User type: External → Create
+
+App name: anything (e.g. "Genius GTM MCP")
+
+User support email: your email
+
+Developer contact email: your email → Save
+
+Under Test users, click Add Users and add the Google account you'll sign in with
+
+Open https://console.cloud.google.com/apis/credentials
+
+Create credentials → OAuth client ID
+
+Application type: Desktop app
+
+Name: anything → Create
+
+Copy the Client ID and Client secret from the dialog
