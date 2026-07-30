@@ -20,7 +20,6 @@ Quick verification — paste both commands in your terminal:
 node --version   # should print v18.x or newer
 git --version    # should print git version 2.x or newer
 
-
 If either prints "command not found", install it using the link above before continuing.
 
 Quick start — 3 steps
