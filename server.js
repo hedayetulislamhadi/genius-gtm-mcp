@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Genius GTM MCP — stdio server
+ * Genius GTM MCP — Ultimate Master Suite (GTM + Cloudflare + Stape)
  * Built by Hedayetul Islam Hadi
  */
 
@@ -23,6 +23,7 @@ const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || saved.refresh_token;
 
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || saved.cf_account_id;
 const CF_API_TOKEN = process.env.CF_API_TOKEN || saved.cf_api_token;
+const STAPE_API_KEY = process.env.STAPE_API_KEY || saved.stape_api_key;
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
   console.error(
@@ -60,7 +61,7 @@ function bad(err) {
     isError: true,
     content: [{
       type: 'text',
-      text: 'GTM/CF API error:\n' + JSON.stringify({
+      text: 'API Error:\n' + JSON.stringify({
         message: err?.message || String(err),
         code: err?.code,
         status: err?.response?.status,
@@ -85,7 +86,7 @@ async function workspaceResource(svc, action, a, plural) {
   throw new Error(`Invalid action: ${action}`);
 }
 
-// ─── tool definitions (19 GTM + 5 Custom Tools = 24 Tools) ───────────────────
+// ─── tool definitions (26 Master Tools: GTM + CF + Stape + Analytics) ────────
 const tools = [
   // ─── GTM 19 Tools ───
   { name: 'gtm_account', description: 'Manage GTM accounts. actions: list | get | update.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','update'] }, accountId: { type: 'string' }, payload: { type: 'object' } }, required: ['action'] } },
@@ -173,6 +174,37 @@ const tools = [
         scriptContent: { type: 'string', description: 'The complete JavaScript code for the Worker' }
       }, 
       required: ['workerName', 'scriptContent'] 
+    } 
+  },
+
+  // ─── NEW: Stape.io Master Tools (sGTM & Domain Verification) ───
+  { 
+    name: 'stape_container_manager', 
+    description: 'Manage Stape.io sGTM server containers: list, get status, create new container, or delete.', 
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        action: { type: 'string', enum: ['list', 'get', 'create', 'delete'], description: 'Action to perform on Stape' },
+        containerId: { type: 'string', description: 'Stape Container ID' },
+        name: { type: 'string', description: 'Container Name (for create)' },
+        gtmServerContainerConfig: { type: 'string', description: 'sGTM Container Config string from Google GTM' },
+        region: { type: 'string', description: 'Server region e.g., us, eu, sg (default: us)' }
+      }, 
+      required: ['action'] 
+    } 
+  },
+  { 
+    name: 'stape_domain_manager', 
+    description: 'Add a custom domain to a Stape sGTM container and fetch the required DNS verification records.', 
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        action: { type: 'string', enum: ['list', 'add', 'verify', 'delete'], description: 'Domain action' },
+        containerId: { type: 'string', description: 'Stape Container ID' },
+        domain: { type: 'string', description: 'Custom domain name e.g., metrics.yoursite.com' },
+        domainId: { type: 'string', description: 'Stape Domain ID (required for verify/delete)' }
+      }, 
+      required: ['action', 'containerId'] 
     } 
   }
 ];
@@ -419,6 +451,67 @@ async function handleCall(name, a) {
       const data = await res.json();
       if (!data.success) throw new Error('Cloudflare Error: ' + JSON.stringify(data.errors, null, 2));
       return ok({ message: `Successfully deployed worker "${a.workerName}" to Cloudflare!`, status: 'LIVE' });
+    }
+
+    // ─── NEW: Stape.io Handlers ───
+    case 'stape_container_manager': {
+      if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
+      const baseUrl = 'https://api.stape.io/v1';
+      const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
+
+      if (a.action === 'list') {
+        const res = await fetch(`${baseUrl}/containers`, { headers });
+        return ok(await res.json());
+      }
+      if (a.action === 'get') {
+        const res = await fetch(`${baseUrl}/containers/${a.containerId}`, { headers });
+        return ok(await res.json());
+      }
+      if (a.action === 'create') {
+        const res = await fetch(`${baseUrl}/containers`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ name: a.name, config: a.gtmServerContainerConfig, region: a.region || 'us' })
+        });
+        return ok(await res.json());
+      }
+      if (a.action === 'delete') {
+        const res = await fetch(`${baseUrl}/containers/${a.containerId}`, { method: 'DELETE', headers });
+        return ok(await res.json());
+      }
+      throw new Error('Invalid Stape Container Action');
+    }
+
+    case 'stape_domain_manager': {
+      if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
+      const baseUrl = `https://api.stape.io/v1/containers/${a.containerId}/domains`;
+      const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
+
+      if (a.action === 'list') {
+        const res = await fetch(baseUrl, { headers });
+        return ok(await res.json());
+      }
+      if (a.action === 'add') {
+        const res = await fetch(baseUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ domain: a.domain })
+        });
+        const data = await res.json();
+        return ok({
+          message: `Added custom domain '${a.domain}' to Stape container. Add these DNS records in Cloudflare:`,
+          dns_instructions: data
+        });
+      }
+      if (a.action === 'verify') {
+        const res = await fetch(`${baseUrl}/${a.domainId}/verify`, { method: 'POST', headers });
+        return ok(await res.json());
+      }
+      if (a.action === 'delete') {
+        const res = await fetch(`${baseUrl}/${a.domainId}`, { method: 'DELETE', headers });
+        return ok(await res.json());
+      }
+      throw new Error('Invalid Stape Domain Action');
     }
 
     default:
