@@ -9,9 +9,9 @@ Manage Google Tag Manager from Claude Desktop, Cursor, or any MCP-compatible cli
 You need three things installed on your computer. All free, ~5 minutes total if you don't already have them.
 
 | | Required for | How to install |
-|---|---|---|
-| **Node.js 18 or newer** | running `npx` | Mac: `brew install node` or download from https://nodejs.org · Windows: download installer from https://nodejs.org · Linux: `sudo apt install nodejs npm` |
-| **Git** | letting `npx` clone the package from GitHub | Mac: `brew install git` (or just run `git --version` once and macOS will offer to install Xcode Command Line Tools) · Windows: download from https://git-scm.com · Linux: `sudo apt install git` |
+| :--- | :--- | :--- |
+| **Node.js 18 or newer** | running `npx` | Mac: `brew install node` or download from [https://nodejs.org](https://nodejs.org) · Windows: download installer from [https://nodejs.org](https://nodejs.org) · Linux: `sudo apt install nodejs npm` |
+| **Git** | letting `npx` clone the package from GitHub | Mac: `brew install git` (or just run `git --version` once and macOS will offer to install Xcode Command Line Tools) · Windows: download from [https://git-scm.com](https://git-scm.com) · Linux: `sudo apt install git` |
 | **A terminal** | running the commands below | Mac: open **Terminal.app** (Spotlight → "Terminal") · Windows: open **PowerShell** or **Windows Terminal** · Linux: any terminal emulator |
 
 Quick verification — paste both commands in your terminal:
