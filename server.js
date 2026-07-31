@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Genius GTM MCP — Ultimate Master Suite (GTM + Cloudflare + Stape)
+ * Genius GTM MCP — Ultimate Master Suite (GTM + Cloudflare + Stape + Meta)
  * Built by Hedayetul Islam Hadi
  */
 
@@ -24,6 +24,7 @@ const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || saved.refresh_token;
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || saved.cf_account_id;
 const CF_API_TOKEN = process.env.CF_API_TOKEN || saved.cf_api_token;
 const STAPE_API_KEY = process.env.STAPE_API_KEY || saved.stape_api_key;
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || saved.meta_access_token;
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
   console.error(
@@ -86,7 +87,7 @@ async function workspaceResource(svc, action, a, plural) {
   throw new Error(`Invalid action: ${action}`);
 }
 
-// ─── tool definitions (26 Master Tools: GTM + CF + Stape + Analytics) ────────
+// ─── tool definitions ────────────────────────────────────────────────────────
 const tools = [
   // ─── GTM 19 Tools ───
   { name: 'gtm_account', description: 'Manage GTM accounts. actions: list | get | update.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list','get','update'] }, accountId: { type: 'string' }, payload: { type: 'object' } }, required: ['action'] } },
@@ -177,7 +178,7 @@ const tools = [
     } 
   },
 
-  // ─── NEW: Stape.io Master Tools (sGTM & Domain Verification) ───
+  // ─── Stape.io Master Tools ───
   { 
     name: 'stape_container_manager', 
     description: 'Manage Stape.io sGTM server containers: list, get status, create new container, or delete.', 
@@ -206,6 +207,23 @@ const tools = [
       }, 
       required: ['action', 'containerId'] 
     } 
+  },
+
+  // ─── NEW: Meta Pixel & CAPI Tool ───
+  {
+    name: 'meta_pixel_capi_manager',
+    description: 'Manage Meta Pixels, check datasets, or send server-side test events via Conversions API (CAPI).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_pixels', 'send_capi_event'], description: 'Action to perform' },
+        pixel_id: { type: 'string', description: 'Facebook Pixel ID' },
+        event_name: { type: 'string', description: 'Standard event name e.g., Purchase, Lead, ViewContent' },
+        event_source_url: { type: 'string', description: 'Website URL where the event occurred' },
+        user_data: { type: 'object', description: 'Hashed user data (em, ph, client_ip_address, etc.)' }
+      },
+      required: ['action']
+    }
   }
 ];
 
@@ -270,14 +288,14 @@ async function handleCall(name, a) {
       const wp = workspacePath(a.accountId, a.containerId, a.workspaceId);
       const fp = a.entityId ? `${wp}/folders/${a.entityId}` : null;
       const f = tm.accounts.containers.workspaces.folders;
-      if (a.action === 'list')          return ok(unwrap(await f.list({ parent: wp })));
-      if (a.action === 'get')           return ok(unwrap(await f.get({ path: fp })));
-      if (a.action === 'create')        return ok(unwrap(await f.create({ parent: wp, requestBody: a.payload || {} })));
-      if (a.action === 'update')        return ok(unwrap(await f.update({ path: fp, requestBody: a.payload || {} })));
-      if (a.action === 'delete')        return ok(unwrap(await f.delete({ path: fp })));
-      if (a.action === 'revert')        return ok(unwrap(await f.revert({ path: fp })));
-      if (a.action === 'entities')      return ok(unwrap(await f.entities({ path: fp })));
-      if (a.action === 'move_entities') return ok(unwrap(await f.move_entities_to_folder({ path: fp, tagId: a.payload?.tagIds, triggerId: a.payload?.triggerIds, variableId: a.payload?.variableIds })));
+      if (a.action === 'list')              return ok(unwrap(await f.list({ parent: wp })));
+      if (a.action === 'get')               return ok(unwrap(await f.get({ path: fp })));
+      if (a.action === 'create')            return ok(unwrap(await f.create({ parent: wp, requestBody: a.payload || {} })));
+      if (a.action === 'update')            return ok(unwrap(await f.update({ path: fp, requestBody: a.payload || {} })));
+      if (a.action === 'delete')            return ok(unwrap(await f.delete({ path: fp })));
+      if (a.action === 'revert')            return ok(unwrap(await f.revert({ path: fp })));
+      if (a.action === 'entities')          return ok(unwrap(await f.entities({ path: fp })));
+      if (a.action === 'move_entities')     return ok(unwrap(await f.move_entities_to_folder({ path: fp, tagId: a.payload?.tagIds, triggerId: a.payload?.triggerIds, variableId: a.payload?.variableIds })));
       throw new Error('Invalid action');
     }
     case 'gtm_version': {
@@ -285,13 +303,13 @@ async function handleCall(name, a) {
       const vp = a.versionId ? versionPath(a.accountId, a.containerId, a.versionId) : null;
       const wp = a.workspaceId ? workspacePath(a.accountId, a.containerId, a.workspaceId) : null;
       const v = tm.accounts.containers.versions;
-      if (a.action === 'list')                  return ok(unwrap(await v.list({ parent: cp })));
-      if (a.action === 'get')                   return ok(unwrap(await v.get({ path: vp })));
-      if (a.action === 'live')                  return ok(unwrap(await v.live({ parent: cp })));
-      if (a.action === 'publish')               return ok(unwrap(await v.publish({ path: vp })));
-      if (a.action === 'undelete')              return ok(unwrap(await v.undelete({ path: vp })));
-      if (a.action === 'set_latest')            return ok(unwrap(await v.set_latest({ path: vp })));
-      if (a.action === 'create_from_workspace') return ok(unwrap(await tm.accounts.containers.workspaces.create_version({ path: wp, requestBody: a.payload || {} })));
+      if (a.action === 'list')                      return ok(unwrap(await v.list({ parent: cp })));
+      if (a.action === 'get')                       return ok(unwrap(await v.get({ path: vp })));
+      if (a.action === 'live')                      return ok(unwrap(await v.live({ parent: cp })));
+      if (a.action === 'publish')                   return ok(unwrap(await v.publish({ path: vp })));
+      if (a.action === 'undelete')                  return ok(unwrap(await v.undelete({ path: vp })));
+      if (a.action === 'set_latest')                return ok(unwrap(await v.set_latest({ path: vp })));
+      if (a.action === 'create_from_workspace')     return ok(unwrap(await tm.accounts.containers.workspaces.create_version({ path: wp, requestBody: a.payload || {} })));
       throw new Error('Invalid action');
     }
     case 'gtm_version_header': {
@@ -346,7 +364,7 @@ async function handleCall(name, a) {
       return ok(unwrap(await fn.call(parent, a.params || {})));
     }
 
-    // ─── Custom Tool Handlers: DataLayer & CAPI ───
+    // ─── Custom Tool Handlers ───
     case 'genius_datalayer_builder': {
       const { eventName, includeItems } = a;
       let snippet = `<script>\nwindow.dataLayer = window.dataLayer || [];\nwindow.dataLayer.push({\n  event: '${eventName}',`;
@@ -404,7 +422,6 @@ async function handleCall(name, a) {
       });
     }
 
-    // ─── Custom Tool Handlers: Cloudflare DNS & Same Origin Workers ───
     case 'cloudflare_zone_lookup': {
       if (!CF_API_TOKEN) throw new Error('Cloudflare API Token missing! Run "node cli.js cf-auth" first.');
       const res = await fetch(`https://api.cloudflare.com/client/v4/zones?name=${a.domainName}`, {
@@ -453,7 +470,6 @@ async function handleCall(name, a) {
       return ok({ message: `Successfully deployed worker "${a.workerName}" to Cloudflare!`, status: 'LIVE' });
     }
 
-    // ─── NEW: Stape.io Handlers ───
     case 'stape_container_manager': {
       if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = 'https://api.stape.io/v1';
@@ -512,6 +528,45 @@ async function handleCall(name, a) {
         return ok(await res.json());
       }
       throw new Error('Invalid Stape Domain Action');
+    }
+
+    case 'meta_pixel_capi_manager': {
+      if (!META_ACCESS_TOKEN) throw new Error('Meta Access Token missing! Run "node cli.js meta-auth" first.');
+      const baseGraphUrl = 'https://graph.facebook.com/v19.0';
+
+      if (a.action === 'list_pixels') {
+        const res = await fetch(`${baseGraphUrl}/me/adaccounts?fields=name,account_id&access_token=${META_ACCESS_TOKEN}`);
+        const data = await res.json();
+        return ok(data);
+      }
+
+      if (a.action === 'send_capi_event') {
+        if (!a.pixel_id) throw new Error('Pixel ID is required for sending CAPI events.');
+        const url = `${baseGraphUrl}/${a.pixel_id}/events`;
+        const payload = {
+          data: [
+            {
+              event_name: a.event_name || 'ViewContent',
+              event_time: Math.floor(Date.now() / 1000),
+              event_source_url: a.event_source_url || 'https://example.com',
+              action_source: 'website',
+              user_data: a.user_data || {}
+            }
+          ],
+          access_token: META_ACCESS_TOKEN
+        };
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.error) throw new Error('Meta CAPI Error: ' + JSON.stringify(data.error, null, 2));
+        return ok({ message: `Successfully sent CAPI event '${a.event_name}' to Pixel ${a.pixel_id}`, response: data });
+      }
+
+      throw new Error('Invalid Meta action');
     }
 
     default:

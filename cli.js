@@ -54,6 +54,28 @@ if (cmd === 'auth') {
   await writeFile(CONFIG_FILE, JSON.stringify(saved, null, 2), { mode: 0o600 });
   console.log(`\nStape.io API Key saved successfully to ${CONFIG_FILE}!\n`);
   process.exit(0);
+} else if (cmd === 'meta-auth') {
+  const readline = (await import('node:readline/promises')).default;
+  const { stdin: input, stdout: output } = await import('node:process');
+  const { readFile, writeFile } = await import('node:fs/promises');
+  
+  const rl = readline.createInterface({ input, output });
+  console.log('\n=== Genius GTM MCP — Meta (Facebook) Setup ===\n');
+  const appId = (await rl.question('Paste your Meta App ID: ')).trim();
+  const appSecret = (await rl.question('Paste your Meta App Secret: ')).trim();
+  const accessToken = (await rl.question('Paste your Meta Access Token: ')).trim();
+  rl.close();
+
+  let saved = {};
+  try { saved = JSON.parse(await readFile(CONFIG_FILE, 'utf8')); } catch {}
+  
+  saved.meta_app_id = appId;
+  saved.meta_app_secret = appSecret;
+  saved.meta_access_token = accessToken;
+  
+  await writeFile(CONFIG_FILE, JSON.stringify(saved, null, 2), { mode: 0o600 });
+  console.log(`\nMeta credentials saved successfully to ${CONFIG_FILE}!\n`);
+  process.exit(0);
 } else if (cmd === 'logout') {
   const { deleteConfigFile } = await import(pathToFileURL(join(__dirname, 'auth.js')).href);
   const deleted = await deleteConfigFile();
@@ -70,19 +92,21 @@ if (cmd === 'auth') {
     console.log(`Client: ${cfg.client_id || '(unknown)'}`);
     console.log(`Cloudflare Account ID: ${cfg.cf_account_id || '(not set)'}`);
     console.log(`Stape API Key: ${cfg.stape_api_key ? '******** (Saved)' : '(not set)'}`);
+    console.log(`Meta App ID: ${cfg.meta_app_id || '(not set)'}`);
   }
   process.exit(0);
 } else if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
   console.log(`
-Genius GTM MCP server (Master Suite: GTM + Cloudflare + Stape)
+Genius GTM MCP server (Master Suite: GTM + Cloudflare + Stape + Meta)
 
 Usage:
-  genius-gtm-mcp            Start the MCP server
-  genius-gtm-mcp auth       Connect with Google OAuth (GTM)
-  genius-gtm-mcp cf-auth    Connect with Cloudflare API
-  genius-gtm-mcp stape-auth Connect with Stape.io API
-  genius-gtm-mcp logout     Delete saved credentials
-  genius-gtm-mcp status     Show config status
+  genius-gtm-mcp             Start the MCP server
+  genius-gtm-mcp auth        Connect with Google OAuth (GTM)
+  genius-gtm-mcp cf-auth     Connect with Cloudflare API
+  genius-gtm-mcp stape-auth  Connect with Stape.io API
+  genius-gtm-mcp meta-auth   Connect with Meta (Facebook) API
+  genius-gtm-mcp logout      Delete saved credentials
+  genius-gtm-mcp status      Show config status
 `);
   process.exit(0);
 } else if (!cmd) {
