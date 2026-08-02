@@ -24,7 +24,12 @@ const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || saved.refresh_token;
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || saved.cf_account_id;
 const CF_API_TOKEN = process.env.CF_API_TOKEN || saved.cf_api_token;
 const STAPE_API_KEY = process.env.STAPE_API_KEY || saved.stape_api_key;
+
+// ─── FIX: META_PIXEL_ID was referenced in meta_pixel_capi_manager but never defined ───
+const META_APP_ID = process.env.META_APP_ID || saved.meta_app_id;
+const META_APP_SECRET = process.env.META_APP_SECRET || saved.meta_app_secret;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || saved.meta_access_token;
+const META_PIXEL_ID = process.env.META_PIXEL_ID || saved.meta_pixel_id;
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
   console.error(
@@ -209,18 +214,21 @@ const tools = [
     } 
   },
 
-  // ─── NEW: Meta Pixel & CAPI Tool ───
+  // ─── Meta Pixel & CAPI Tool ───
   {
     name: 'meta_pixel_capi_manager',
-    description: 'Manage Meta Pixels, check datasets, or send server-side test events via Conversions API (CAPI).',
+    description: 'Manage Meta Pixels, fetch ad accounts and pixels, or send server-side events via Conversions API (CAPI).',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_pixels', 'send_capi_event'], description: 'Action to perform' },
-        pixel_id: { type: 'string', description: 'Facebook Pixel ID' },
+        action: { type: 'string', enum: ['list_ad_accounts', 'list_pixels', 'send_capi_event'], description: 'Action to perform' },
+        adAccountId: { type: 'string', description: 'Optional Meta Ad Account ID (e.g. act_313006043640351)' },
+        pixel_id: { type: 'string', description: 'Facebook Pixel ID or Dataset ID. Falls back to your saved default Pixel ID from meta-auth if omitted.' },
         event_name: { type: 'string', description: 'Standard event name e.g., Purchase, Lead, ViewContent' },
         event_source_url: { type: 'string', description: 'Website URL where the event occurred' },
-        user_data: { type: 'object', description: 'Hashed user data (em, ph, client_ip_address, etc.)' }
+        test_event_code: { type: 'string', description: 'Optional Test Event Code from Meta Events Manager' },
+        user_data: { type: 'object', description: 'Hashed user data (em, ph, client_ip_address, etc.)' },
+        custom_data: { type: 'object', description: 'Custom parameters like currency, value' }
       },
       required: ['action']
     }
@@ -533,40 +541,71 @@ async function handleCall(name, a) {
     case 'meta_pixel_capi_manager': {
       if (!META_ACCESS_TOKEN) throw new Error('Meta Access Token missing! Run "node cli.js meta-auth" first.');
       const baseGraphUrl = 'https://graph.facebook.com/v19.0';
+      const headers = { 'Authorization': `Bearer ${META_ACCESS_TOKEN}`, 'Content-Type': 'application/json' };
 
-      if (a.action === 'list_pixels') {
-        const res = await fetch(`${baseGraphUrl}/me/adaccounts?fields=name,account_id&access_token=${META_ACCESS_TOKEN}`);
+      if (a.action === 'list_ad_accounts') {
+        const res = await fetch(`${baseGraphUrl}/me/adaccounts?fields=id,name,account_status,currency,timezone_name`, { headers });
         const data = await res.json();
+        if (data.error) throw new Error('Meta API Error: ' + JSON.stringify(data.error, null, 2));
         return ok(data);
       }
 
-      if (a.action === 'send_capi_event') {
-        if (!a.pixel_id) throw new Error('Pixel ID is required for sending CAPI events.');
-        const url = `${baseGraphUrl}/${a.pixel_id}/events`;
+      if (a.action === 'list_pixels') {
+        let adAccounts = [];
+        if (a.adAccountId || a.ad_account_id) {
+          adAccounts = [{ id: a.adAccountId || a.ad_account_id, name: 'Specified Account' }];
+        } else {
+          const accRes = await fetch(`${baseGraphUrl}/me/adaccounts?fields=id,name`, { headers });
+          const accData = await accRes.json();
+          if (accData.error) throw new Error('Meta API Error: ' + JSON.stringify(accData.error, null, 2));
+          adAccounts = accData.data || [];
+        }
+
+        const pixels = [];
+        for (const acc of adAccounts) {
+          const pxRes = await fetch(`${baseGraphUrl}/${acc.id}/adspixels?fields=id,name,creation_time,last_fired_time,is_unavailable`, { headers });
+          const pxData = await pxRes.json();
+          if (pxData.data && pxData.data.length > 0) {
+            for (const px of pxData.data) {
+              pixels.push({ ...px, ad_account_id: acc.id, ad_account_name: acc.name });
+            }
+          }
+        }
+        return ok({ count: pixels.length, ad_accounts_scanned: adAccounts.length, pixels, ad_accounts: adAccounts });
+      }
+
+      if (a.action === 'send_capi_event' || a.action === 'send_event') {
+        // FIX: META_PIXEL_ID is now properly defined above (was previously undefined, causing a ReferenceError crash)
+        const pixelId = a.pixel_id || a.pixelId || META_PIXEL_ID;
+        if (!pixelId) throw new Error('Pixel ID is required for sending CAPI events. Pass it as "pixel_id", or save a default via "node cli.js meta-auth".');
+        const url = `${baseGraphUrl}/${pixelId}/events`;
         const payload = {
           data: [
             {
-              event_name: a.event_name || 'ViewContent',
+              event_name: a.event_name || a.eventName || 'ViewContent',
               event_time: Math.floor(Date.now() / 1000),
-              event_source_url: a.event_source_url || 'https://example.com',
+              event_source_url: a.event_source_url || a.eventSourceUrl || 'https://example.com',
               action_source: 'website',
-              user_data: a.user_data || {}
+              user_data: a.user_data || a.userData || { client_ip_address: '127.0.0.1', client_user_agent: 'Mozilla/5.0' },
+              custom_data: a.custom_data || a.customData || {}
             }
-          ],
-          access_token: META_ACCESS_TOKEN
+          ]
         };
+        if (a.test_event_code || a.testEventCode) {
+          payload.test_event_code = a.test_event_code || a.testEventCode;
+        }
 
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.error) throw new Error('Meta CAPI Error: ' + JSON.stringify(data.error, null, 2));
-        return ok({ message: `Successfully sent CAPI event '${a.event_name}' to Pixel ${a.pixel_id}`, response: data });
+        return ok({ message: `Successfully sent CAPI event '${payload.data[0].event_name}' to Pixel ${pixelId}`, response: data });
       }
 
-      throw new Error('Invalid Meta action');
+      throw new Error(`Invalid Meta action: ${a.action}`);
     }
 
     default:

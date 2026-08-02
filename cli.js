@@ -64,6 +64,7 @@ if (cmd === 'auth') {
   const appId = (await rl.question('Paste your Meta App ID: ')).trim();
   const appSecret = (await rl.question('Paste your Meta App Secret: ')).trim();
   const accessToken = (await rl.question('Paste your Meta Access Token: ')).trim();
+  const pixelId = (await rl.question('Paste your default Meta Pixel ID (optional, press Enter to skip): ')).trim();
   rl.close();
 
   let saved = {};
@@ -72,6 +73,7 @@ if (cmd === 'auth') {
   saved.meta_app_id = appId;
   saved.meta_app_secret = appSecret;
   saved.meta_access_token = accessToken;
+  if (pixelId) saved.meta_pixel_id = pixelId;
   
   await writeFile(CONFIG_FILE, JSON.stringify(saved, null, 2), { mode: 0o600 });
   console.log(`\nMeta credentials saved successfully to ${CONFIG_FILE}!\n`);
@@ -93,6 +95,7 @@ if (cmd === 'auth') {
     console.log(`Cloudflare Account ID: ${cfg.cf_account_id || '(not set)'}`);
     console.log(`Stape API Key: ${cfg.stape_api_key ? '******** (Saved)' : '(not set)'}`);
     console.log(`Meta App ID: ${cfg.meta_app_id || '(not set)'}`);
+    console.log(`Meta Pixel ID: ${cfg.meta_pixel_id || '(not set)'}`);
   }
   process.exit(0);
 } else if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
