@@ -1,6 +1,6 @@
 # Genius GTM MCP
 
-Manage Google Tag Manager from Claude Desktop, Cursor, or any MCP-compatible client using natural language. 26 tools cover the full GTM v2 API, Cloudflare infrastructure, and Stape automation: accounts, containers, workspaces, tags, triggers, variables, templates, versions, environments, destinations, DNS records, proxy workers, and more.
+Manage Google Tag Manager from Claude Desktop, Cursor, or any MCP-compatible client using natural language. 27 tools cover the full GTM v2 API, Cloudflare infrastructure, Stape automation, and Meta Conversions API: accounts, containers, workspaces, tags, triggers, variables, templates, versions, environments, destinations, DNS records, proxy workers, and more.
 
 100 percent local. Your credentials stay on your machine. Built by Hedayetul Islam Hadi — Genius Tracking. MIT licensed.
 
@@ -56,16 +56,17 @@ The tool will:
 
 That's it for GTM setup. No more typing.
 
-**Optional — Cloudflare and Stape.io tools**
+**Optional — Cloudflare, Stape.io, and Facebook/Meta tools**
 
-If you want the Cloudflare (DNS, Workers) or Stape.io (sGTM containers, domains) tools, connect those separately:
+If you want the Cloudflare (DNS, Workers), Stape.io (sGTM containers, domains), or Facebook/Meta CAPI tools, connect those separately:
 
 ```
 npx -y github:hedayetulislamhadi/genius-gtm-mcp cf-auth      # paste your Cloudflare Account ID + API Token
 npx -y github:hedayetulislamhadi/genius-gtm-mcp stape-auth   # paste your Stape.io API Key
+npx -y github:hedayetulislamhadi/genius-gtm-mcp fb-auth      # paste your Meta Pixel ID + CAPI Access Token
 ```
 
-Both get appended to the same `~/.genius-gtm-mcp/config.json`. GTM tools work fine without these — only the `cloudflare_*` and `stape_*` tools need them.
+All of these get appended to the same `~/.genius-gtm-mcp/config.json`. GTM tools work fine without them — only the `cloudflare_*`, `stape_*`, and `genius_capi_send` tools need their respective credentials.
 
 ### Step 3 — Add 4 lines to Claude Desktop config
 
@@ -102,6 +103,7 @@ npx -y github:hedayetulislamhadi/genius-gtm-mcp             # Start the MCP serv
 npx -y github:hedayetulislamhadi/genius-gtm-mcp auth        # Connect / re-connect with Google (GTM)
 npx -y github:hedayetulislamhadi/genius-gtm-mcp cf-auth     # Connect with Cloudflare (Account ID + API Token)
 npx -y github:hedayetulislamhadi/genius-gtm-mcp stape-auth  # Connect with Stape.io (API Key)
+npx -y github:hedayetulislamhadi/genius-gtm-mcp fb-auth     # Connect with Facebook/Meta CAPI (Pixel ID + Access Token)
 npx -y github:hedayetulislamhadi/genius-gtm-mcp logout      # Delete the saved credentials
 npx -y github:hedayetulislamhadi/genius-gtm-mcp status      # Show whether credentials are saved
 npx -y github:hedayetulislamhadi/genius-gtm-mcp help        # Usage
@@ -120,8 +122,9 @@ To switch to a different Google account, run `logout` then `auth` again.
 - "Enable the Page URL and Click Element built-in variables in workspace 1"
 - "Create a Cloudflare proxy worker for server-side GTM on stape.io"
 - "List DNS records for my tracking subdomain"
+- "Send a Purchase event to Meta CAPI with value 49.99 USD"
 
-## All 26 tools
+## All 27 tools
 
 **GTM (19 tools)**
 
@@ -152,7 +155,7 @@ To switch to a different Google account, run `logout` then `auth` again.
 | Tool | Coverage |
 |---|---|
 | `genius_datalayer_builder` | generates a server-side optimized GA4 ecommerce dataLayer snippet for a given event |
-| `genius_capi_validator` | generates/validates a Meta CAPI, TikTok, or Snapchat server-side event payload for a given event |
+| `genius_capi_validator` | generates/validates a Meta CAPI, TikTok, or Snapchat server-side event payload template for a given event (no auth required — payload only) |
 
 **Cloudflare (3 tools)**
 
@@ -169,12 +172,50 @@ To switch to a different Google account, run `logout` then `auth` again.
 | `stape_container_manager` | list, get, create, delete sGTM server containers |
 | `stape_domain_manager` | list, add, verify, delete a custom tracking domain on a Stape container |
 
-## How it works
+**Facebook / Meta (1 tool)**
 
-The MCP server runs as a local Node.js process on your machine, spawned by Claude Desktop via stdio. It talks directly from your computer to `tagmanager.googleapis.com` (and, where configured, the Cloudflare and Stape APIs) using your own credentials. Nothing routes through any third-party server. Your GTM data never leaves your machine except for direct API calls to Google, Cloudflare, and Stape.
+| Tool | Coverage |
+|---|---|
+| `genius_capi_send` | sends a real, hashed event directly to Meta's Conversions API using your saved Pixel ID and access token |
+
+## Facebook / Meta Conversions API (CAPI)
+
+Two tools cover Meta CAPI, depending on what you need:
+
+- **`genius_capi_validator`** — builds a payload *template* only. No auth required. Good for reference or for wiring into your own server-side code (a GTM server tag, Cloudflare Worker, or Stape sGTM client).
+- **`genius_capi_send`** — actually sends the event to `graph.facebook.com` using your saved Pixel ID and access token. Requires `fb-auth` first.
+
+### Setting up `fb-auth`
 
 ```
-Claude Desktop  →  local Node process (your machine)  →  tagmanager.googleapis.com / api.cloudflare.com / stape.io API
+npx -y github:hedayetulislamhadi/genius-gtm-mcp fb-auth
+```
+
+You'll be asked for:
+
+1. **Meta Pixel ID** — found in Meta Events Manager → your Pixel → Settings
+2. **Meta CAPI Access Token** — same page, under **Conversions API** → **Generate access token**
+
+Both are saved locally to `~/.genius-gtm-mcp/config.json` with `0600` permissions — never sent anywhere except directly to Meta's API when you ask Claude to send an event.
+
+### Example
+
+> "Send a Purchase event to Meta CAPI for email john@example.com, value 49.99 USD"
+
+Claude calls `genius_capi_send`, which:
+1. SHA-256 hashes the email/phone before sending (never sends PII in plaintext)
+2. Builds the event payload
+3. POSTs it to `https://graph.facebook.com/v20.0/{pixel-id}/events`
+4. Returns Meta's response, including `events_received` count for confirmation
+
+Use `testEventCode` (from Events Manager → Test Events tab) while testing, so events don't pollute your real reporting.
+
+## How it works
+
+The MCP server runs as a local Node.js process on your machine, spawned by Claude Desktop via stdio. It talks directly from your computer to `tagmanager.googleapis.com` (and, where configured, the Cloudflare, Stape, and Meta APIs) using your own credentials. Nothing routes through any third-party server. Your data never leaves your machine except for direct API calls to Google, Cloudflare, Stape, and Meta.
+
+```
+Claude Desktop  →  local Node process (your machine)  →  tagmanager.googleapis.com / api.cloudflare.com / stape.io API / graph.facebook.com
 ```
 
 Each user has their own Google Cloud project and OAuth client. Your API quota is your own, with Google's default limits (250,000 requests/day, 1,500/100s). You can request quota increases for free in Google Cloud Console at any time.
@@ -184,6 +225,7 @@ Each user has their own Google Cloud project and OAuth client. Your API quota is
 - Credentials live only in `~/.genius-gtm-mcp/config.json` on your machine with `0600` permissions
 - stdio transport — no inbound HTTP port, no network exposure
 - Revoke Google access any time at https://myaccount.google.com/permissions
+- Revoke Meta access any time at https://business.facebook.com/events_manager2 → your Pixel → Settings → Conversions API → revoke token
 - Remove the local copy: `npx -y github:hedayetulislamhadi/genius-gtm-mcp logout`
 
 ## Troubleshooting
@@ -199,6 +241,8 @@ Each user has their own Google Cloud project and OAuth client. Your API quota is
 **Want to switch Google accounts** — `npx -y github:hedayetulislamhadi/genius-gtm-mcp logout` then `npx -y github:hedayetulislamhadi/genius-gtm-mcp auth`. New browser sign-in, new account, new token.
 
 **"Google did NOT return a refresh_token"** — Google only sends a refresh token on the first consent for a given OAuth client + Google account combination. Revoke access at https://myaccount.google.com/permissions and re-run `auth`.
+
+**Meta CAPI event not showing in Events Manager** — check the response from `genius_capi_send` for `events_received`. If it's 0, check that your Pixel ID and access token are current (`status` command), and that you're not filtering by a `testEventCode` you forgot to check under the Test Events tab.
 
 ## Multi-account setup — connect multiple Google accounts at once
 
