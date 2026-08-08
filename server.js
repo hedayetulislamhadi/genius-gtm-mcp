@@ -481,7 +481,12 @@ async function handleCall(name, a) {
     case 'stape_container_manager': {
       if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = 'https://api.app.stape.io/api/v2';
-      const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
+      // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
+      const headers = { 
+        'x-api-key': STAPE_API_KEY,
+        'Authorization': `Bearer ${STAPE_API_KEY}`,
+        'Content-Type': 'application/json' 
+      };
 
       if (a.action === 'list') {
         const res = await fetch(`${baseUrl}/containers`, { headers });
@@ -509,7 +514,12 @@ async function handleCall(name, a) {
     case 'stape_domain_manager': {
       if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = `https://api.app.stape.io/api/v2/containers/${a.containerId}/domains`;
-      const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
+      // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
+      const headers = { 
+        'x-api-key': STAPE_API_KEY,
+        'Authorization': `Bearer ${STAPE_API_KEY}`,
+        'Content-Type': 'application/json' 
+      };
 
       if (a.action === 'list') {
         const res = await fetch(baseUrl, { headers });
@@ -575,7 +585,6 @@ async function handleCall(name, a) {
       }
 
       if (a.action === 'send_capi_event' || a.action === 'send_event') {
-        // FIX: META_PIXEL_ID is now properly defined above (was previously undefined, causing a ReferenceError crash)
         const pixelId = a.pixel_id || a.pixelId || META_PIXEL_ID;
         if (!pixelId) throw new Error('Pixel ID is required for sending CAPI events. Pass it as "pixel_id", or save a default via "node cli.js meta-auth".');
         const url = `${baseGraphUrl}/${pixelId}/events`;
