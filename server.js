@@ -479,11 +479,12 @@ async function handleCall(name, a) {
     }
 
     case 'stape_container_manager': {
-      if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
+      let currentKey = process.env.STAPE_API_KEY;
+      try { currentKey = currentKey || JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      if (!currentKey) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = 'https://api.app.stape.io/api/v2';
-      // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
       const headers = { 
-        'X-AUTH-TOKEN': STAPE_API_KEY,
+        'X-AUTH-TOKEN': currentKey,
         'Content-Type': 'application/json' 
       };
 
@@ -511,11 +512,12 @@ async function handleCall(name, a) {
     }
 
     case 'stape_domain_manager': {
-      if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
+      let currentKey = process.env.STAPE_API_KEY;
+      try { currentKey = currentKey || JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      if (!currentKey) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = `https://api.app.stape.io/api/v2/containers/${a.containerId}/domains`;
-      // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
       const headers = { 
-        'X-AUTH-TOKEN': STAPE_API_KEY,
+        'X-AUTH-TOKEN': currentKey,
         'Content-Type': 'application/json' 
       };
 
