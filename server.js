@@ -480,7 +480,7 @@ async function handleCall(name, a) {
 
     case 'stape_container_manager': {
       if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
-      const baseUrl = 'https://api.stape.io/v1';
+      const baseUrl = 'https://api.app.stape.io/api/v2';
       const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
 
       if (a.action === 'list') {
