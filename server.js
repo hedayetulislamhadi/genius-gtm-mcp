@@ -508,7 +508,7 @@ async function handleCall(name, a) {
 
     case 'stape_domain_manager': {
       if (!STAPE_API_KEY) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
-      const baseUrl = `https://api.stape.io/v1/containers/${a.containerId}/domains`;
+      const baseUrl = `https://api.app.stape.io/api/v2/containers/${a.containerId}/domains`;
       const headers = { 'Authorization': `Bearer ${STAPE_API_KEY}`, 'Content-Type': 'application/json' };
 
       if (a.action === 'list') {
