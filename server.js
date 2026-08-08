@@ -483,8 +483,7 @@ async function handleCall(name, a) {
       const baseUrl = 'https://api.app.stape.io/api/v2';
       // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
       const headers = { 
-        'x-api-key': STAPE_API_KEY,
-        'Authorization': `Bearer ${STAPE_API_KEY}`,
+        'X-AUTH-TOKEN': STAPE_API_KEY,
         'Content-Type': 'application/json' 
       };
 
@@ -516,8 +515,7 @@ async function handleCall(name, a) {
       const baseUrl = `https://api.app.stape.io/api/v2/containers/${a.containerId}/domains`;
       // ─── UPDATED: Including both 'x-api-key' and 'Authorization: Bearer' headers ───
       const headers = { 
-        'x-api-key': STAPE_API_KEY,
-        'Authorization': `Bearer ${STAPE_API_KEY}`,
+        'X-AUTH-TOKEN': STAPE_API_KEY,
         'Content-Type': 'application/json' 
       };
 
