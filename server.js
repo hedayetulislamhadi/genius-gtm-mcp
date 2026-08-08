@@ -482,6 +482,7 @@ async function handleCall(name, a) {
       let currentKey = '';
       try { currentKey = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
       currentKey = currentKey || process.env.STAPE_API_KEY;
+      console.error('DEBUG STAPE KEY:', currentKey);
       if (!currentKey) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = 'https://api.app.stape.io/api/v2';
       const headers = { 
@@ -501,7 +502,7 @@ async function handleCall(name, a) {
         const res = await fetch(`${baseUrl}/containers`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ name: a.name, config: a.gtmServerContainerConfig, region: a.region || 'us' })
+          body: JSON.stringify({ name: a.name, config: a.gtmServerContainerConfig, zone: { type: a.region || 'apd' } })
         });
         return ok(await res.json());
       }
