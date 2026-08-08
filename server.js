@@ -479,8 +479,9 @@ async function handleCall(name, a) {
     }
 
     case 'stape_container_manager': {
-      let currentKey = process.env.STAPE_API_KEY;
-      try { currentKey = currentKey || JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      let currentKey = '';
+      try { currentKey = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      currentKey = currentKey || process.env.STAPE_API_KEY;
       if (!currentKey) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = 'https://api.app.stape.io/api/v2';
       const headers = { 
@@ -512,8 +513,9 @@ async function handleCall(name, a) {
     }
 
     case 'stape_domain_manager': {
-      let currentKey = process.env.STAPE_API_KEY;
-      try { currentKey = currentKey || JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      let currentKey = '';
+      try { currentKey = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')).stape_api_key; } catch {}
+      currentKey = currentKey || process.env.STAPE_API_KEY;
       if (!currentKey) throw new Error('Stape API Key missing! Run "node cli.js stape-auth" first.');
       const baseUrl = `https://api.app.stape.io/api/v2/containers/${a.containerId}/domains`;
       const headers = { 
